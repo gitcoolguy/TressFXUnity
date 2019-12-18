@@ -347,8 +347,9 @@ namespace TressFX
 			this.simulationShader.SetFloat ("g_GravityMagnitude", this.gravityMagnitude);
 			this.simulationShader.SetFloat ("g_TimeStep", Time.deltaTime);
 			this.simulationShader.SetInt ("g_NumOfStrandsPerThreadGroup", this.numOfStrandsPerThreadGroup);
-			this.simulationShader.SetInt ("g_NumFollowHairsPerGuideHair", this.master.hairData.m_NumFollowHairsPerOneGuideHair);
-			this.simulationShader.SetInt ("g_bWarp", this.isWarping ? 1 : 0);
+			//this.simulationShader.SetInt ("g_NumFollowHairsPerGuideHair", this.master.hairData.m_NumFollowHairsPerOneGuideHair);
+            this.simulationShader.SetInt("g_NumFollowHairsPerGuideHair", 4);
+            this.simulationShader.SetInt ("g_bWarp", this.isWarping ? 1 : 0);
             this.simulationShader.SetInt("g_NumLocalShapeMatchingIterations", this.localShapeConstraintIterations);
             this.simulationShader.SetFloat("g_TipSeparationFactor", this.tipSeperationFactor);
             this.simulationShader.SetInt("g_bSingleHeadTransform", 1);

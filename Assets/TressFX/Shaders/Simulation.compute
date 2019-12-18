@@ -26,8 +26,8 @@ int g_bCollision;
 float g_GravityMagnitude;
 float g_TimeStep;
 
-uint g_NumOfStrandsPerThreadGroup;
-uint g_NumFollowHairsPerGuideHair;
+uint g_NumOfStrandsPerThreadGroup;//一组有多少strand 4
+uint g_NumFollowHairsPerGuideHair;//后面跟随了多少strand，即1个strand模拟，后面g_NumFollowHairsPerGuideHair跟随，不是5，而应该是4
 
 int	g_bWarp;
 uint g_NumLocalShapeMatchingIterations;
@@ -55,10 +55,10 @@ struct HairToTriangleMapping
     uint    reserved;           // for future use
 };
 
-RWStructuredBuffer<float4> g_HairVertexPositions; 
-RWStructuredBuffer<float4> g_HairVertexPositionsPrev;
+RWStructuredBuffer<float4> g_HairVertexPositions; //当前帧顶点
+RWStructuredBuffer<float4> g_HairVertexPositionsPrev;//上一帧顶点
 RWStructuredBuffer<float4> g_HairVertexTangents; 
-RWStructuredBuffer<float4> g_InitialHairPositions;
+RWStructuredBuffer<float4> g_InitialHairPositions;//初始顶点
 RWStructuredBuffer<float4> g_GlobalRotations;
 RWStructuredBuffer<float4> g_LocalRotations;
 RWStructuredBuffer<Transforms> g_Transforms;
@@ -255,10 +255,34 @@ void CalcIndicesInVertexLevelTotal(uint local_id, uint group_id, inout uint glob
 	globalVertexIndex = globalStrandIndex * numVerticesInTheStrand + localVertexIndex;
 }
 
+//local_id 组内第几个
+//group_id 第几组
+//indexForSharedMem 组内第几个
+//numVerticesInTheStrand 一个strand有多少vertex 16
+//0: 0 1 2 3
+//1: 0 1 2 3
+//2: 0 1 2 3
+//3: 0 1 2 3
+//4: 0 1 2 3
+//5: 0 1 2 3
+//6: 0 1 2 3
+//7: 0 1 2 3
+//8: 0 1 2 3
+//9: 0 1 2 3
+//10: 0 1 2 3
+//11: 0 1 2 3
+//12: 0 1 2 3
+//13: 0 1 2 3
+//14: 0 1 2 3
+//15: 0 1 2 3
+//localStrandIndex 组内第几个strand
+//globalStrandIndex 在全局中是第几个strand
+//localVertexIndex 在一strand中是第几个顶点
+//globalVertexIndex 全局中第几个顶点
 void CalcIndicesInVertexLevelMaster(uint local_id, uint group_id, inout uint globalStrandIndex, inout uint localStrandIndex, inout uint globalVertexIndex, inout uint localVertexIndex, inout uint numVerticesInTheStrand, inout uint indexForSharedMem, inout uint strandType)
 {
 	indexForSharedMem = local_id;
-	numVerticesInTheStrand = (THREAD_GROUP_SIZE / g_NumOfStrandsPerThreadGroup);
+	numVerticesInTheStrand = (THREAD_GROUP_SIZE / g_NumOfStrandsPerThreadGroup);//16
 
 	localStrandIndex = local_id % g_NumOfStrandsPerThreadGroup;
 	globalStrandIndex = group_id * g_NumOfStrandsPerThreadGroup + localStrandIndex;	
@@ -277,6 +301,7 @@ void CalcIndicesInStrandLevelTotal(uint local_id, uint group_id, inout uint glob
 	globalRootVertexIndex = globalStrandIndex * numVerticesInTheStrand;
 }
 
+//globalRootVertexIndex 当前strand的root vertex在全局vertex中的下标
 void CalcIndicesInStrandLevelMaster(uint local_id, uint group_id, inout uint globalStrandIndex, inout uint numVerticesInTheStrand, inout uint globalRootVertexIndex, inout uint strandType)
 {
 	globalStrandIndex = THREAD_GROUP_SIZE*group_id + local_id;	
@@ -401,12 +426,20 @@ void UpdateFinalVertexPositions(float4 oldPosition, float4 newPosition, int glob
 //
 // One thread computes one vertex.
 //
+//GIndex 组内第几个
+//GId.x 第几组
 //--------------------------------------------------------------------------------------
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
 void IntegrationAndGlobalShapeConstraints(uint GIndex : SV_GroupIndex,
                   uint3 GId : SV_GroupID,
                   uint3 DTid : SV_DispatchThreadID)
 {
+	//indexForSharedMem 组内第几个
+	//numVerticesInTheStrand 一个strand有多少vertex 16
+	//localStrandIndex 组内第几个strand
+	//globalStrandIndex 在全局中是第几个strand
+	//localVertexIndex 在一strand中是第几个顶点
+	//globalVertexIndex 全局中第几个顶点
 	uint globalStrandIndex, localStrandIndex, globalVertexIndex, localVertexIndex, numVerticesInTheStrand, indexForSharedMem, strandType;
 	CalcIndicesInVertexLevelMaster(GIndex, GId.x, globalStrandIndex, localStrandIndex, globalVertexIndex, localVertexIndex, numVerticesInTheStrand, indexForSharedMem, strandType);
 	
@@ -416,7 +449,7 @@ void IntegrationAndGlobalShapeConstraints(uint GIndex : SV_GroupIndex,
     // Copy data into shared memory 
     initialPos = g_InitialHairPositions[globalVertexIndex];
 
-    if ( g_bSingleHeadTransform )
+    if ( g_bSingleHeadTransform )//g_bSingleHeadTransform=true
         initialPos.xyz = mul(float4( initialPos.xyz, 1), g_ModelTransformForHead).xyz;
     else
         initialPos.xyz = mul(float4( initialPos.xyz, 1), g_Transforms[globalStrandIndex].tfm).xyz;

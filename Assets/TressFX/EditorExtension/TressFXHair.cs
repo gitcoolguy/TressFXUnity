@@ -103,7 +103,7 @@ namespace TressFX
 		/// The number of following hairs per one guide hair.
 		/// </summary>
 		[SerializeField]
-		[HideInInspector]
+		//[HideInInspector]
 		public int m_NumFollowHairsPerOneGuideHair;
 
 		/// <summary>
