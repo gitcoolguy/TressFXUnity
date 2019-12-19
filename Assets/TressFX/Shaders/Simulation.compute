@@ -454,7 +454,7 @@ void IntegrationAndGlobalShapeConstraints(uint GIndex : SV_GroupIndex,
     else
         initialPos.xyz = mul(float4( initialPos.xyz, 1), g_Transforms[globalStrandIndex].tfm).xyz;
 
-	if (g_bWarp)
+	if (g_bWarp)//start后，第一次进来为true，其余为false
 		currentPos = initialPos;
 	else
 		currentPos = sharedPos[indexForSharedMem] = g_HairVertexPositions[globalVertexIndex];
@@ -478,7 +478,7 @@ void IntegrationAndGlobalShapeConstraints(uint GIndex : SV_GroupIndex,
 
     // Global Shape Constraints
     float stiffnessForGlobalShapeMatching = GetStiffnessForGlobalShapeMatching(strandType);
-    float globalShapeMatchingEffectiveRange = GetGlobalShapeMatchingEffectiveRange(strandType);
+    float globalShapeMatchingEffectiveRange = GetGlobalShapeMatchingEffectiveRange(strandType);//影响头几个顶点
     
     if ( stiffnessForGlobalShapeMatching > 0 && globalShapeMatchingEffectiveRange )
     {
@@ -594,12 +594,15 @@ void LocalShapeConstraints(uint GIndex : SV_GroupIndex,
 //  instead of multiple dispatch calls on the CPU, for better performance
 //
 //  This kernel should be called only when the number vertices per strand is 8 or 16.
+//GIndex 组内第几个
+//GId.x 第几组
 //--------------------------------------------------------------------------------------
 [numthreads(THREAD_GROUP_SIZE, 1, 1)]
 void LocalShapeConstraintsWithIteration(uint GIndex : SV_GroupIndex,
                   uint3 GId : SV_GroupID,
                   uint3 DTid : SV_DispatchThreadID)
 {
+	//globalRootVertexIndex 当前strand的root vertex在全局vertex中的下标
 	uint local_id, group_id, globalStrandIndex, numVerticesInTheStrand, globalRootVertexIndex, strandType;
 	CalcIndicesInStrandLevelMaster(GIndex, GId.x, globalStrandIndex, numVerticesInTheStrand, globalRootVertexIndex, strandType);
 
@@ -613,9 +616,10 @@ void LocalShapeConstraintsWithIteration(uint GIndex : SV_GroupIndex,
 	// Copy strand data into registers, for faster iteration
 	//------------------------------
 	uint globalVertexIndex = 0;
-	float4 sharedStrandPos[MAX_VERTS_PER_STRAND];
+	float4 sharedStrandPos[MAX_VERTS_PER_STRAND];//每strand最多16个顶点
 	uint localVertexIndex = 0;
-	
+
+	//记录当前strand的所有顶点，放到sharedStrandPos中
 	for ( localVertexIndex = 0; localVertexIndex < numVerticesInTheStrand; localVertexIndex++ )
 	{
 		globalVertexIndex = globalRootVertexIndex + localVertexIndex;
@@ -624,23 +628,25 @@ void LocalShapeConstraintsWithIteration(uint GIndex : SV_GroupIndex,
 
 	//--------------------------------------------
 	// Local shape constraint for bending/twisting 
-	//--------------------------------------------    
+	//--------------------------------------------
+	//g_NumLocalShapeMatchingIterations为6
 	for ( uint iterations = 0; iterations < g_NumLocalShapeMatchingIterations; iterations++)
 	{
-		float4 pos = sharedStrandPos[1];
-		float4 rotGlobal = g_GlobalRotations[globalRootVertexIndex];
-	
+		float4 pos = sharedStrandPos[1];//第一个点
+		float4 rotGlobal = g_GlobalRotations[globalRootVertexIndex];//第0个点旋转
+		
+		//从第一到倒数第二
 		for ( uint localVertexIndex = 1; localVertexIndex < numVerticesInTheStrand-1; localVertexIndex++ )
 		{
 			globalVertexIndex = globalRootVertexIndex + localVertexIndex;
-			float4 pos_plus_one = sharedStrandPos[localVertexIndex+1];
+			float4 pos_plus_one = sharedStrandPos[localVertexIndex+1];//从第二到倒数第一
 
 			//--------------------------------
 			// Update position i and i_plus_1
 			//--------------------------------
             float4 rotGlobalWorld;
 
-            if ( g_bSingleHeadTransform )
+            if ( g_bSingleHeadTransform )//g_bSingleHeadTransform=true
                 rotGlobalWorld = MultQuaternionAndQuaternion(g_ModelRotateForHead, rotGlobal);
             else
                 rotGlobalWorld = MultQuaternionAndQuaternion(g_Transforms[globalStrandIndex].quat, rotGlobal);
@@ -707,10 +713,16 @@ void LengthConstraintsWindAndCollision(uint GIndex : SV_GroupIndex,
                   uint3 GId : SV_GroupID,
                   uint3 DTid : SV_DispatchThreadID)
 {
+	//indexForSharedMem 组内第几个
+	//numVerticesInTheStrand 一个strand有多少vertex 16
+	//localStrandIndex 组内第几个strand 0 1 2 3
+	//globalStrandIndex 在全局中是第几个strand
+	//localVertexIndex 在一strand中是第几个顶点
+	//globalVertexIndex 全局中第几个顶点
 	uint globalStrandIndex, localStrandIndex, globalVertexIndex, localVertexIndex, numVerticesInTheStrand, indexForSharedMem, strandType;
 	CalcIndicesInVertexLevelMaster(GIndex, GId.x, globalStrandIndex, localStrandIndex, globalVertexIndex, localVertexIndex, numVerticesInTheStrand, indexForSharedMem, strandType);
 	
-	uint numOfStrandsPerThreadGroup = g_NumOfStrandsPerThreadGroup;
+	uint numOfStrandsPerThreadGroup = g_NumOfStrandsPerThreadGroup;//4
 				
     //------------------------------
     // Copy data into shared memory
@@ -745,7 +757,8 @@ void LengthConstraintsWindAndCollision(uint GIndex : SV_GroupIndex,
 	//----------------------------
 	uint a = floor(numVerticesInTheStrand/2.0f);
 	uint b = floor((numVerticesInTheStrand-1)/2.0f); 
-		
+	
+	//g_NumLengthConstraintIterations=3
 	for ( int iterationE=0; iterationE < g_NumLengthConstraintIterations; iterationE++ )
 	{
 		uint sharedIndex = 2*localVertexIndex * numOfStrandsPerThreadGroup + localStrandIndex;
@@ -842,6 +855,8 @@ void LengthConstraintsWindAndCollision(uint GIndex : SV_GroupIndex,
     //-------------------
     // Compute tangent
     //-------------------
+	//当前顶点指向下一排顶点的方向为tangent
+	//如果当前顶点是最后一排呢！！！！！！！！！！！！
     float3 tangent = sharedPos[indexForSharedMem+numOfStrandsPerThreadGroup].xyz - sharedPos[indexForSharedMem].xyz;
     g_HairVertexTangents[globalVertexIndex].xyz = normalize(tangent);
 	
@@ -863,6 +878,12 @@ void UpdateFollowHairVertices(uint GIndex : SV_GroupIndex,
                               uint3 GId : SV_GroupID,
                               uint3 DTid : SV_DispatchThreadID)
 {
+	//indexForSharedMem 组内第几个
+	//numVerticesInTheStrand 一个strand有多少vertex 16
+	//localStrandIndex 组内第几个strand 0 1 2 3
+	//globalStrandIndex 在全局中是第几个strand
+	//localVertexIndex 在一strand中是第几个顶点
+	//globalVertexIndex 全局中第几个顶点
     uint globalStrandIndex, localStrandIndex, globalVertexIndex, localVertexIndex, numVerticesInTheStrand, indexForSharedMem, strandType;
     CalcIndicesInVertexLevelMaster(GIndex, GId.x, globalStrandIndex, localStrandIndex, globalVertexIndex, localVertexIndex, numVerticesInTheStrand, indexForSharedMem, strandType);
 
