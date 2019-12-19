@@ -132,9 +132,12 @@ namespace TressFX
 
 		private bool firstUpdate = true;
 
+        private Vector4[] pos;
+
 
 		public void Awake()
 		{
+            pos = new Vector4[16];
 			// No shader? :-(
 			if (this.simulationShader == null)
 			{
@@ -214,8 +217,8 @@ namespace TressFX
 			int vertexCount = (this.followHairsLastFrame ? this.master.hairData.m_NumGuideHairVertices : this.master.hairData.m_NumTotalHairVertices);
 			int strandCount = (this.followHairsLastFrame ? this.master.hairData.m_NumGuideHairStrands : this.master.hairData.m_NumTotalHairStrands);
 			
-			int numOfGroupsForCS_VertexLevel = (int)(((float)(vertexCount) / (float)THREAD_GROUP_SIZE)*1); // * 1 = * density
-			int numOfGroupsForCS_StrandLevel = (int)(((float)(strandCount) / (float)THREAD_GROUP_SIZE) *1);
+			int numOfGroupsForCS_VertexLevel = (int)(((float)(vertexCount+ THREAD_GROUP_SIZE-1) / (float)THREAD_GROUP_SIZE)*1); // * 1 = * density
+			int numOfGroupsForCS_StrandLevel = (int)(((float)(strandCount+ THREAD_GROUP_SIZE-1) / (float)THREAD_GROUP_SIZE) *1);
 			
 			if (this.followHairsLastFrame && !this.followHairs)
 			{
@@ -227,17 +230,29 @@ namespace TressFX
             if (this.doIntegrationAndGlobalShapeConstraints)
 			    this.simulationShader.Dispatch (this.IntegrationAndGlobalShapeConstraintsKernelId, numOfGroupsForCS_VertexLevel, 1, 1);
             if (this.doLocalShapeConstraints)
-                this.simulationShader.Dispatch (this.LocalShapeConstraintsWithIterationKernelId, numOfGroupsForCS_StrandLevel, 1, 1);
+                this.simulationShader.Dispatch(this.LocalShapeConstraintsWithIterationKernelId, numOfGroupsForCS_StrandLevel, 1, 1);
             if (this.doLengthConstraintsWindAndCollision)
-                this.simulationShader.Dispatch (this.LengthConstraintsWindAndCollisionKernelId, numOfGroupsForCS_VertexLevel, 1, 1);
+                this.simulationShader.Dispatch(this.LengthConstraintsWindAndCollisionKernelId, numOfGroupsForCS_VertexLevel, 1, 1);
 
-			if (this.followHairs)
-				this.simulationShader.Dispatch (this.UpdateFollowHairVerticesKernelId, numOfGroupsForCS_VertexLevel, 1, 1);
+            //if (this.followHairs)
+            //    this.simulationShader.Dispatch(this.UpdateFollowHairVerticesKernelId, numOfGroupsForCS_VertexLevel, 1, 1);
 
-			this.followHairsLastFrame = this.followHairs;
-		}
+            this.followHairsLastFrame = this.followHairs;
 
-		private void SimulateWind()
+            master.g_HairVertexPositions.GetData(pos);
+        }
+
+        void OnDrawGizmosSelected()
+        {
+            if (pos == null) return;
+            //Debug:
+            for (int i = 0; i < pos.Length; ++i)
+            {
+                Gizmos.DrawSphere(pos[i], 1f);
+            }
+        }
+
+        private void SimulateWind()
 		{
 			// Simulate wind
 			float wM = windMagnitude * (Mathf.Pow( Mathf.Sin(Time.frameCount*0.05f), 2.0f ) + 0.5f);
@@ -347,8 +362,8 @@ namespace TressFX
 			this.simulationShader.SetFloat ("g_GravityMagnitude", this.gravityMagnitude);
 			this.simulationShader.SetFloat ("g_TimeStep", Time.deltaTime);
 			this.simulationShader.SetInt ("g_NumOfStrandsPerThreadGroup", this.numOfStrandsPerThreadGroup);
-			//this.simulationShader.SetInt ("g_NumFollowHairsPerGuideHair", this.master.hairData.m_NumFollowHairsPerOneGuideHair);
-            this.simulationShader.SetInt("g_NumFollowHairsPerGuideHair", 4);
+            this.simulationShader.SetInt("g_NumFollowHairsPerGuideHair", this.master.hairData.m_NumFollowHairsPerOneGuideHair);
+            //this.simulationShader.SetInt("g_NumFollowHairsPerGuideHair", 4);
             this.simulationShader.SetInt ("g_bWarp", this.isWarping ? 1 : 0);
             this.simulationShader.SetInt("g_NumLocalShapeMatchingIterations", this.localShapeConstraintIterations);
             this.simulationShader.SetFloat("g_TipSeparationFactor", this.tipSeperationFactor);

@@ -80,15 +80,73 @@ namespace TressFX
 			
 			#endif
 		}
-		
-		#if UNITY_EDITOR
-		
-		/// <summary>
-		/// Quaternions to vector4 casting function.
-		/// </summary>
-		/// <returns>The to vector4.</returns>
-		/// <param name="quaternions">Quaternions.</param>
-		private static Vector4[] QuaternionsToVector4(Quaternion[] quaternions)
+
+        public static void CreateHairData(this TressFXHair ext)
+        {
+            ext.m_NumTotalHairVertices = 16;
+            ext.m_NumTotalHairStrands = 1;
+            ext.m_NumOfVerticesPerStrand = 16;
+            ext.m_NumGuideHairVertices = 16;
+            ext.m_NumGuideHairStrands = 1;
+            ext.m_NumFollowHairsPerOneGuideHair = 0;
+            ext.m_pHairStrandType = new int[1] { 0 };
+            ext.m_pRefVectors = new Vector4[16];
+            for(int i=0;i<16;++i)
+            {
+                ext.m_pRefVectors[i] = new Vector4(1, 0, 0, 0);
+            }
+            ext.m_pGlobalRotations = new Vector4[16];
+            for(int i=0;i<16;++i)
+            {
+                ext.m_pGlobalRotations[i] = new Vector4(0, 0, 0, 1);
+            }
+            ext.m_pLocalRotations = new Vector4[16];//没用
+            for(int i=0;i<16;++i)
+            {
+                ext.m_pLocalRotations[i] = new Vector4(0, 0, 0, 1);
+            }
+            ext.m_pVertices = new Vector4[16];
+            for(int i=0;i<16;++i)
+            {
+                ext.m_pVertices[i] = new Vector4(0, -i, 0, 1);
+            }
+            ext.m_pVertices[0] = new Vector4(0, 0, 0, 0);
+            ext.m_pVertices[1] = new Vector4(0, -1, 0, 0);
+            ext.m_pTangents = new Vector4[16];
+            for(int i=0;i<16;++i)
+            {
+                ext.m_pTangents[i] = new Vector4(0, -1, 0, 0);
+            }
+            ext.m_pThicknessCoeffs = new float[16];
+            for(int i=0;i<16;++i)
+            {
+                ext.m_pThicknessCoeffs[i] = 1;
+            }
+            ext.m_pFollowRootOffset = new Vector4[1];
+            ext.m_pRestLengths = new float[16];
+            for(int i=0;i<16;++i)
+            {
+                ext.m_pRestLengths[i] = 1;
+            }
+            ext.hairPartConfig = new HairPartConfig[1];
+            ext.hairPartConfig[0].Damping = 0.5f;
+            ext.hairPartConfig[0].GlobalShapeMatchingEffectiveRange = 0.5f;
+            ext.hairPartConfig[0].StiffnessForGlobalShapeMatching = 0.5f;
+            ext.hairPartConfig[0].StiffnessForLocalShapeMatching = 0.5f;
+            ext.m_bSphere = new TressFXBoundingSphere();
+            ext.m_TriangleIndices = new int[3];
+            ext.m_LineIndices = new int[16];
+            ext.m_TexCoords = new Vector4[16];
+        }
+
+        #if UNITY_EDITOR
+
+        /// <summary>
+        /// Quaternions to vector4 casting function.
+        /// </summary>
+        /// <returns>The to vector4.</returns>
+        /// <param name="quaternions">Quaternions.</param>
+        private static Vector4[] QuaternionsToVector4(Quaternion[] quaternions)
 		{
 			Vector4[] vectors = new Vector4[quaternions.Length];
 			for (int i = 0; i < vectors.Length; i++)
@@ -214,6 +272,15 @@ namespace TressFX
 
             newHairData.LoadHairData(hair);
 
+            EditorUtility.SetDirty(newHairData);
+            AssetDatabase.SaveAssets();
+        }
+
+        [MenuItem("Assets/Create/TressFX/Create Test Hair")]
+        public static void CreateTestHair()
+        {
+            TressFXHair newHairData = ScriptableObjectUtility.CreateAsset<TressFXHair>("TestHair");
+            newHairData.CreateHairData();
             EditorUtility.SetDirty(newHairData);
             AssetDatabase.SaveAssets();
         }

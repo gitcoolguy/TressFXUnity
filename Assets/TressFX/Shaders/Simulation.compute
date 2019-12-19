@@ -445,7 +445,7 @@ void IntegrationAndGlobalShapeConstraints(uint GIndex : SV_GroupIndex,
 	
     float4 currentPos = float4(0, 0, 0, 0); // position when this step starts. In other words, a position from the last step. 
     float4 initialPos = float4(0, 0, 0, 0); // rest position
-
+	
     // Copy data into shared memory 
     initialPos = g_InitialHairPositions[globalVertexIndex];
 
@@ -646,6 +646,7 @@ void LocalShapeConstraintsWithIteration(uint GIndex : SV_GroupIndex,
 			//--------------------------------
             float4 rotGlobalWorld;
 
+			//每次循环开始都要保证Pi-Pi-1的方向为rotGlobalWorld*(1,0,0)的方向
             if ( g_bSingleHeadTransform )//g_bSingleHeadTransform=true
                 rotGlobalWorld = MultQuaternionAndQuaternion(g_ModelRotateForHead, rotGlobal);
             else
@@ -679,6 +680,7 @@ void LocalShapeConstraintsWithIteration(uint GIndex : SV_GroupIndex,
 				rotAxis = normalize(rotAxis);
 
 				float4 localRot = MakeQuaternion(angle_radian, rotAxis);
+				//使vec的方向=rotGlobalWorld*(1,0,0)的方向
 				rotGlobal = MultQuaternionAndQuaternion(rotGlobal, localRot);
 			}	
 
